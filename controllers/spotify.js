@@ -1,7 +1,7 @@
 import request from "request";
 
-var client_id = "d1c0f316548b465cacd04c6bfb739729"; // Your client id
-var client_secret = "11759af065db4c63bcb439ea3bcf7752"; // Your secret
+var client_id = process.env.client_id; // Your client id
+var client_secret = process.env.client_secret; // Your secret
 
 // Allocate memory for the encoded client ID and secret
 const encoded = Buffer.alloc(client_id.length + client_secret.length + 1);
