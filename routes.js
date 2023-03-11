@@ -2,6 +2,9 @@ import express from "express";
 import spotify from "./controllers/spotify.js";
 const router = express.Router();
 
-router.post("/spotify/search", spotify.searchForTrack);
+router.post("/spotify/user/", spotify.getUserPlaylists);
+router.post("/spotify/collection/", spotify.getMainPlaylist);
+router.get("/spotify/track/:trackId", spotify.getTrack);
+router.get("/spotify/artist/:artistId", spotify.getArtist);
 
 export default router;
