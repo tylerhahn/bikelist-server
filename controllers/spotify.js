@@ -1,4 +1,4 @@
-import request from "request";
+const request = require("request");
 
 var client_id = process.env.client_id; // Your client id
 var client_secret = process.env.client_secret; // Your secret

@@ -1,5 +1,5 @@
-import express from "express";
-import spotify from "./controllers/spotify.js";
+const express = require("express");
+const spotify = require("./controllers/spotify.js");
 const router = express.Router();
 
 router.post("/spotify/user/", spotify.getUserPlaylists);
