@@ -1,7 +1,7 @@
-import express from "express";
-import routes from "./routes.js";
-import cors from "cors";
-import helmet from "helmet";
+const express = require("express");
+const routes = require("./routes.js");
+const cors = require("cors");
+const helmet = require("helmet");
 
 const app = express();
 
@@ -19,4 +19,4 @@ const server = app.listen(PORT, () => {
   console.log("server is running on port", server.address().port);
 });
 
-export default app;
+module.exports = app;

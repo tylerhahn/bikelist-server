@@ -1,4 +1,7 @@
 const request = require("request");
+const dotenv = require("dotenv");
+const { saveSong } = require("./firebase");
+dotenv.config();
 
 var client_id = process.env.client_id; // Your client id
 var client_secret = process.env.client_secret; // Your secret
@@ -23,6 +26,25 @@ var authOptions = {
     grant_type: "client_credentials",
   },
   json: true,
+};
+
+const getGenres = (req, res) => {
+  request.post(authOptions, function (error, response, body) {
+    if (!error && response.statusCode === 200) {
+      // use the access token to access the Spotify Web API
+      var token = body.access_token;
+      var options = {
+        url: "https://api.spotify.com/v1/recommendations/available-genre-seeds",
+        headers: {
+          Authorization: "Bearer " + token,
+        },
+        json: true,
+      };
+      request.get(options, function (error, response, body) {
+        res.json(body);
+      });
+    }
+  });
 };
 
 const getUserPlaylists = (req, res) => {
@@ -61,56 +83,105 @@ const getTrackTempo = (trackId) => {
           json: true,
         };
         request.get(options, function (error, response, body) {
+          (error) => reject(error);
           resolve(body.tempo);
         });
       } else {
+        console.log(error);
         reject(error);
       }
     });
   });
 };
 
-const getMainPlaylist = (req, res) => {
-  const { playlistId } = req.body;
+const syncPlaylist = (req, res) => {
+  const { playlistId, genre } = req.body;
   if (!playlistId) {
     return res.status(400).json({ error: "No playlist ID provided" });
   }
 
-  request.post(authOptions, function (error, response, body) {
-    if (!error && response.statusCode === 200) {
-      // use the access token to access the Spotify Web API
-      var token = body.access_token;
-      var options = {
-        url: `https://api.spotify.com/v1/playlists/${playlistId}`,
-        headers: {
-          Authorization: "Bearer " + token,
-        },
-        json: true,
-      };
-      request.get(options, function (error, response, body) {
-        let allTracks = [];
-        body.tracks.items.map(async (item) => {
-          const genres = await getArtist(item.track.artists[0].id);
-          const tempo = await getTrackTempo(item.track.id);
+  const limit = 100;
+  let offset = 0;
+  let allTracks = [];
 
-          const track = {
-            tempo: tempo,
-            genres: genres,
-            album: item.track.album.name,
-            artist: item.track.artists[0].name,
-            name: item.track.name,
-            uri: item.track.uri,
-            image: item.track.album.images[0].url,
-            id: item.track.id,
-          };
-          allTracks.push(track);
+  function getPlaylistTracks() {
+    console.log("getting playlist tracks");
+    request.post(authOptions, function (error, response, body) {
+      if (!error && response.statusCode === 200) {
+        // use the access token to access the Spotify Web API
+        var token = body.access_token;
+        var options = {
+          url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}`,
+          headers: { Authorization: "Bearer " + token },
+          json: true,
+        };
+        request.get(options, function (error, response, body) {
+          const tracks = body;
+          if (tracks.items && tracks.items.length > 0) {
+            tracks.items.map(async (item) => {
+              const tempo = await getTrackTempo(item.track.id);
 
-          if (allTracks.length === body.tracks.items.length - 1)
+              const track = {
+                tempo: tempo,
+                album: item.track.album.name,
+                artist: item.track.artists[0].name,
+                name: item.track.name,
+                uri: item.track.uri,
+                image: item.track.album.images[0].url,
+                songId: item.track.id,
+                duration: item.track.duration_ms,
+              };
+
+              if (track.tempo) {
+                allTracks.push(track);
+                saveSong(track, genre)
+                  .then((result) => {
+                    console.log(result);
+                  })
+                  .catch((err) => {
+                    console.log(err);
+                  });
+              }
+
+              if (allTracks.length === tracks.total) {
+                res.json(allTracks);
+              }
+            });
+          } else {
             res.json(allTracks);
+          }
+          // pagination logic
+          if (tracks.items && tracks.items.length === limit) {
+            offset += limit;
+            getPlaylistTracks(playlistId);
+          }
+          // resolve(body.tempo);
         });
-      });
-    }
-  });
+      } else {
+        console.log(error);
+        reject(error);
+      }
+    });
+  }
+
+  getPlaylistTracks(playlistId);
+
+  // request.post(authOptions, function (error, response, body) {
+  //   if (!error && response.statusCode === 200) {
+  //     // use the access token to access the Spotify Web API
+  //     var token = body.access_token;
+  //     var options = {
+  //       url: `https://api.spotify.com/v1/playlists/${playlistId}`,
+  //       headers: {
+  //         Authorization: "Bearer " + token,
+  //       },
+  //       json: true,
+  //     };
+  //     request.get(options, function (error, response, body) {
+
+  //     });
+  //   }
+  // });
 };
 
 const getArtist = (artistId) => {
@@ -160,9 +231,10 @@ const getTrack = (req, res) => {
   });
 };
 
-export default {
-  getMainPlaylist,
+module.exports = {
+  syncPlaylist,
   getUserPlaylists,
   getTrack,
   getArtist,
+  getGenres,
 };
